@@ -1,0 +1,91 @@
+library(lme4)
+library(lmerTest)
+library(ggplot2)
+library(dplyr)
+
+#this does some data handling
+jump$outcome <- with(jump, ifelse(cheats>0,1,0))
+
+jump$day <- as.factor(jump$day)
+jump$location <- as.factor(jump$location)
+jump$day1 <- as.factor(jump$location:jump$day)
+
+
+#this model asks whether the probability of at least one cyclist cheating is affected by the total number of pedestrians
+mod<- glmer(outcome ~ pedestrians + (1|location) + (1|day1),data=jump,  family=binomial)
+summary(mod)
+cf <- summary(mod)$coefficients
+
+x <- seq(0,13, 0.5)
+
+
+estimates <- plogis(cf[1] + cf[2]*x)
+
+jump1<- subset(jump, outcome==0) %>% group_by(pedestrians) %>% summarise(number0 = n())
+
+jump2 <- subset(jump, outcome==1) %>% group_by(pedestrians) %>% summarise(number1= n())
+
+proportion <- data.frame(pedestrians = jump1$pedestrians, proportion = jump2$number1/ (jump1$number0+jump2$number1))
+
+
+plot(proportion ~ pedestrians, data=proportion, ylim=c(0,1), ylab="Probability of at least one cheat", xlab="Total number of pedestrians")
+abline(h=0.5, lty=2, col="grey")
+
+
+lines(estimates ~ x, lty=2)
+
+
+#this model asks whether the probability of at least one cyclist cheating is affected by the total number of cyclists 
+
+
+mod<- glmer(outcome ~ ncyc + (1|location) + (1|day1),data=jump,  family=binomial)
+summary(mod)
+
+
+cf <- summary(mod)$coefficients
+
+x <- seq(0,8, 0.5)
+
+
+estimates <- plogis(cf[1] + cf[2]*x)
+
+
+
+jump1 <- jump %>% group_by (ncyc) %>% summarize (prp = mean (cheats/ncyc))
+
+
+plot(prp ~ ncyc, data=jump1, ylim=c(0,1), ylab="Probability of at least one cheat", xlab="Total number of cyclists")
+abline(h=0.5, lty=2, col="grey")
+
+
+lines(estimates ~ x, lty=2)
+
+
+#this model asks 'does the proportion of cyclists who cheat increase as the total number of cyclists increases'
+
+
+
+
+mod<- glmer(cbind(cheats, ncyc-cheats) ~ ncyc + (1|location) + (1|day1),data=jump,  family=binomial)
+summary(mod)
+
+
+
+jump$prpcheats <- with(jump, cheats/ncyc)
+
+
+
+cycjump <- jump%>% group_by(ncyc) %>% summarise(proportion = mean(prpcheats))
+
+
+
+
+cf <- summary(mod)$coefficients
+
+x <- seq(0,8, 0.5)
+
+
+estimates <- plogis(cf[1] + cf[2]*x)
+
+plot(proportion ~ ncyc , data=cycjump, ylim=c(0,1), ylab="Proportion of cyclists cheating", xlab="No. of cyclists")
+lines(estimates ~ x, lty=2)
